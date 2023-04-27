@@ -1,0 +1,44 @@
+name: Conventional Commit Checker
+
+on:
+  push:
+    branches: [ develop, staging, stable ]
+
+jobs:
+  check-commit-message:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v3
+        with:
+          fetch-depth: 0
+
+      - name: Cache Node.js dependencies
+        uses: actions/cache@v2
+        with:
+          path: |
+            ~/.npm
+            ./node_modules
+          key: ${{ runner.os }}-node-${{ hashFiles('**/package-lock.json') }}-commitlint-${{ hashFiles('**/commitlint.config.js') }}
+          restore-keys: |
+            ${{ runner.os }}-node-
+            ${{ runner.os }}-node--commitlint-
+      - name: Install Node.js dependencies
+        run: npm install
+
+      - name: Install Commitlint dependencies
+        run: npm install --save-dev @commitlint/cli @commitlint/config-conventional
+
+      - name: Print versions
+        run: |
+          git --version
+          node --version
+          npm --version
+          npx commitlint --version
+      - name: Validate current commit (last commit) with commitlint
+        if: github.event_name == 'push'
+        run: npx commitlint $(echo $(git log --pretty=%s | grep -iv "merge" -m 1) > temp.txt) -e temp.txt
+
+      - name: Validate PR commits with commitlint
+        if: github.event_name == 'pull_request'
+        run: npx commitlint $(echo $(git log -1 --pretty=%s) > temp.txt) -e temp.txt --verbose
